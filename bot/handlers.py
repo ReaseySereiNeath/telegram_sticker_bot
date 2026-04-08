@@ -42,9 +42,9 @@ async def submission_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if queue_manager.is_blocked(user.id):
         return
 
-    # Rate limiting (max 3 per hour)
-    if queue_manager.get_user_submission_count_last_hour(user.id) >= 3:
-        await message.reply_text("⚠️ You have reached the maximum of 3 submissions per hour. Please try again later.")
+    # Rate limiting (max 10 per hour)
+    if queue_manager.get_user_submission_count_last_hour(user.id) >= 10:
+        await message.reply_text("⚠️ You have reached the maximum of 10 submissions per hour. Please try again later.")
         return
 
     # 1. Detect media type and extract IDs
