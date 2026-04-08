@@ -4,8 +4,21 @@ from telegram import Update, InputSticker
 from telegram.ext import ContextTypes
 from config.settings import ADMIN_IDS, STORAGE_DIR, STICKER_PACK_NAME
 from .queue_manager import QueueManager
+from .image_utils import resize_for_sticker
 
 logger = logging.getLogger(__name__)
+
+
+async def prepare_sticker(bot, file_id: str, emoji_list: list[str]) -> InputSticker:
+    """Download a file by file_id, resize it to 512px, and return an InputSticker."""
+    tg_file = await bot.get_file(file_id)
+    raw = await tg_file.download_as_bytearray()
+    png_bytes = resize_for_sticker(bytes(raw))
+    return InputSticker(
+        sticker=png_bytes,
+        emoji_list=emoji_list,
+        format="static",
+    )
 
 # Singletons (to be initialized by main)
 queue_manager = QueueManager()
@@ -58,12 +71,7 @@ async def approve_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text(f"⏳ Adding sticker `{sub_id}` to pack...", parse_mode="Markdown")
 
     try:
-        # Add to pack via Bot API using file_id directly
-        sticker = InputSticker(
-            sticker=sub["file_id"],
-            emoji_list=[sub["emoji"]],
-            format="static"
-        )
+        sticker = await prepare_sticker(context.bot, sub["file_id"], [sub["emoji"]])
         await context.bot.add_sticker_to_set(
             user_id=sub["from_user_id"],
             name=STICKER_PACK_NAME,
@@ -135,11 +143,7 @@ async def approveall_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     for sub in pending:
         try:
-            sticker = InputSticker(
-                sticker=sub["file_id"],
-                emoji_list=[sub["emoji"]],
-                format="static"
-            )
+            sticker = await prepare_sticker(context.bot, sub["file_id"], [sub["emoji"]])
             await context.bot.add_sticker_to_set(
                 user_id=sub["from_user_id"],
                 name=STICKER_PACK_NAME,
@@ -218,11 +222,7 @@ async def createpack_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     try:
-        sticker = InputSticker(
-            sticker=file_id,
-            emoji_list=["😊"],
-            format="static"
-        )
+        sticker = await prepare_sticker(context.bot, file_id, ["😊"])
         await context.bot.create_new_sticker_set(
             user_id=user.id,
             name=STICKER_PACK_NAME,
