@@ -12,7 +12,9 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     welcome_text = (
         f"Hi {user.first_name}! 👋\n\n"
-        "Send me a Sticker, a PNG, a WebP, or a Photo to submit it to our sticker pack.\n\n"
+        "Send me any image (PNG, JPEG, WebP, BMP, GIF, TIFF, etc.) or a Sticker "
+        "to submit it to our sticker pack.\n\n"
+        "🪄 I'll automatically remove the background and convert it to a sticker-ready PNG!\n\n"
         "If you want a specific emoji for your sticker, just write the emoji in the photo/file caption! "
         "Otherwise, I'll default to 😊.\n\n"
         "Once an admin approves it, I will let you know!"
@@ -36,8 +38,9 @@ async def submission_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     file_id = None
     file_unique_id = None
     original_file_name = None
+    media_type = "photo"
     caption = message.caption or message.text or ""
-    
+
     # Check if blocked
     if queue_manager.is_blocked(user.id):
         return
@@ -53,6 +56,7 @@ async def submission_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         file_id = message.sticker.file_id
         file_unique_id = message.sticker.file_unique_id
         file_size = message.sticker.file_size or 0
+        media_type = "sticker"
         if not extract_emoji(caption) and message.sticker.emoji:
             caption = message.sticker.emoji
     elif message.photo:
@@ -60,15 +64,17 @@ async def submission_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         file_id = best_photo.file_id
         file_unique_id = best_photo.file_unique_id
         file_size = best_photo.file_size or 0
+        media_type = "photo"
     elif message.document:
         doc = message.document
-        if doc.mime_type in ["image/png", "image/webp", "image/jpeg"]:
+        if doc.mime_type and doc.mime_type.startswith("image/"):
             file_id = doc.file_id
             file_unique_id = doc.file_unique_id
             file_size = doc.file_size or 0
             original_file_name = doc.file_name
+            media_type = "document"
         else:
-            await message.reply_text("❌ Please send a valid image format (PNG, WebP, JPEG).")
+            await message.reply_text("❌ Please send a valid image file (PNG, JPEG, WebP, BMP, GIF, TIFF, etc.).")
             return
     else:
         return
@@ -91,7 +97,8 @@ async def submission_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         file_id=file_id,
         file_unique_id=file_unique_id,
         emoji=selected_emoji,
-        original_file_name=original_file_name
+        original_file_name=original_file_name,
+        media_type=media_type
     )
 
     if not submission:

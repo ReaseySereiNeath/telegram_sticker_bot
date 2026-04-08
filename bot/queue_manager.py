@@ -30,7 +30,7 @@ class QueueManager:
         except Exception as e:
             logger.error(f"Failed to save queue to {QUEUE_FILE}: {e}")
 
-    def add_submission(self, from_user_id: int, from_user_name: str, file_id: str, file_unique_id: str, emoji: str, original_file_name: str = None) -> dict:
+    def add_submission(self, from_user_id: int, from_user_name: str, file_id: str, file_unique_id: str, emoji: str, original_file_name: str = None, media_type: str = "photo") -> dict:
         """
         Adds a new submission to the queue. Returns the created submission dict or None if duplicate.
         """
@@ -48,6 +48,7 @@ class QueueManager:
             "emoji": emoji,
             "from_user_id": from_user_id,
             "from_user_name": from_user_name,
+            "media_type": media_type,
             "timestamp": int(time.time()),
             "status": "pending"
         }

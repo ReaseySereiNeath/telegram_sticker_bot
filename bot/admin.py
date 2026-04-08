@@ -9,11 +9,11 @@ from .image_utils import resize_for_sticker
 logger = logging.getLogger(__name__)
 
 
-async def prepare_sticker(bot, file_id: str, emoji_list: list[str]) -> InputSticker:
-    """Download a file by file_id, resize it to 512px, and return an InputSticker."""
+async def prepare_sticker(bot, file_id: str, emoji_list: list[str], bg_remove: bool = True) -> InputSticker:
+    """Download a file by file_id, remove background, resize to 512px, and return an InputSticker."""
     tg_file = await bot.get_file(file_id)
     raw = await tg_file.download_as_bytearray()
-    png_bytes = resize_for_sticker(bytes(raw))
+    png_bytes = resize_for_sticker(bytes(raw), bg_remove=bg_remove)
     return InputSticker(
         sticker=png_bytes,
         emoji_list=emoji_list,
@@ -71,7 +71,9 @@ async def approve_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text(f"⏳ Adding sticker `{sub_id}` to pack...", parse_mode="Markdown")
 
     try:
-        sticker = await prepare_sticker(context.bot, sub["file_id"], [sub["emoji"]])
+        # Skip background removal for stickers (already have transparency)
+        bg_remove = sub.get("media_type") != "sticker"
+        sticker = await prepare_sticker(context.bot, sub["file_id"], [sub["emoji"]], bg_remove=bg_remove)
         await context.bot.add_sticker_to_set(
             user_id=sub["from_user_id"],
             name=STICKER_PACK_NAME,
@@ -143,7 +145,8 @@ async def approveall_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     for sub in pending:
         try:
-            sticker = await prepare_sticker(context.bot, sub["file_id"], [sub["emoji"]])
+            bg_remove = sub.get("media_type") != "sticker"
+            sticker = await prepare_sticker(context.bot, sub["file_id"], [sub["emoji"]], bg_remove=bg_remove)
             await context.bot.add_sticker_to_set(
                 user_id=sub["from_user_id"],
                 name=STICKER_PACK_NAME,
