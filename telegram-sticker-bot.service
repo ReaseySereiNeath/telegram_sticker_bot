@@ -1,0 +1,26 @@
+[Unit]
+Description=Telegram Sticker Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntuserver201
+Group=ubuntuserver201
+WorkingDirectory=/home/ubuntuserver201/telegram_sticker_bot
+EnvironmentFile=/home/ubuntuserver201/telegram_sticker_bot/.env
+ExecStart=/home/ubuntuserver201/telegram_sticker_bot/venv/bin/python main.py
+Restart=on-failure
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=telegram-sticker-bot
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
