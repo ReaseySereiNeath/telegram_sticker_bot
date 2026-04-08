@@ -9,11 +9,11 @@ from .image_utils import resize_for_sticker
 logger = logging.getLogger(__name__)
 
 
-async def prepare_sticker(bot, file_id: str, emoji_list: list[str], bg_remove: bool = True) -> InputSticker:
-    """Download a file by file_id, remove background, resize to 512px, and return an InputSticker."""
+async def prepare_sticker(bot, file_id: str, emoji_list: list[str]) -> InputSticker:
+    """Download a file by file_id, resize it to 512px, and return an InputSticker."""
     tg_file = await bot.get_file(file_id)
     raw = await tg_file.download_as_bytearray()
-    png_bytes = resize_for_sticker(bytes(raw), bg_remove=bg_remove)
+    png_bytes = resize_for_sticker(bytes(raw))
     return InputSticker(
         sticker=png_bytes,
         emoji_list=emoji_list,
@@ -39,7 +39,7 @@ async def pending_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not pending:
         await update.message.reply_text("✅ No pending submissions.")
         return
-    
+
     text = f"📋 **Pending Submissions ({len(pending)}):**\n\n"
     for sub in pending:
         text += f"ID: `{sub['id']}` - Emoji: {sub['emoji']}\nFrom: {sub['from_user_name']} (`{sub['from_user_id']}`)\n\n"
@@ -47,7 +47,7 @@ async def pending_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(text) > 3800:
             text += "... (and more)"
             break
-            
+
     await update.message.reply_text(text, parse_mode="Markdown")
 
 @admin_only
@@ -56,14 +56,14 @@ async def approve_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("⚠️ Usage: /approve <id>")
         return
-        
+
     sub_id = context.args[0]
     sub = queue_manager.get_submission(sub_id)
-    
+
     if not sub:
         await update.message.reply_text("❌ Submssion not found.")
         return
-        
+
     if sub["status"] != "pending":
         await update.message.reply_text(f"⚠️ Submission is already {sub['status']}.")
         return
@@ -71,9 +71,7 @@ async def approve_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text(f"⏳ Adding sticker `{sub_id}` to pack...", parse_mode="Markdown")
 
     try:
-        # Skip background removal for stickers (already have transparency)
-        bg_remove = sub.get("media_type") != "sticker"
-        sticker = await prepare_sticker(context.bot, sub["file_id"], [sub["emoji"]], bg_remove=bg_remove)
+        sticker = await prepare_sticker(context.bot, sub["file_id"], [sub["emoji"]])
         await context.bot.add_sticker_to_set(
             user_id=sub["from_user_id"],
             name=STICKER_PACK_NAME,
@@ -104,15 +102,15 @@ async def reject_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("⚠️ Usage: /reject <id> [reason]")
         return
-        
+
     sub_id = context.args[0]
     reason = " ".join(context.args[1:]) if len(context.args) > 1 else "No reason provided."
-    
+
     sub = queue_manager.get_submission(sub_id)
     if not sub:
         await update.message.reply_text("❌ Submssion not found.")
         return
-        
+
     if sub["status"] != "pending":
         await update.message.reply_text(f"⚠️ Submission is already {sub['status']}.")
         return
@@ -120,7 +118,7 @@ async def reject_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Update queue
     queue_manager.update_status(sub_id, "rejected", reason=reason)
     await update.message.reply_text(f"⛔️ Submission `{sub_id}` rejected.", parse_mode="Markdown")
-    
+
     # Notify user (Phase 6)
     try:
         await context.bot.send_message(
@@ -137,16 +135,15 @@ async def approveall_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not pending:
         await update.message.reply_text("✅ No pending submissions.")
         return
-        
+
     msg = await update.message.reply_text(f"⏳ Starting bulk approval of {len(pending)} submissions...")
-    
+
     success_count = 0
     fail_count = 0
-    
+
     for sub in pending:
         try:
-            bg_remove = sub.get("media_type") != "sticker"
-            sticker = await prepare_sticker(context.bot, sub["file_id"], [sub["emoji"]], bg_remove=bg_remove)
+            sticker = await prepare_sticker(context.bot, sub["file_id"], [sub["emoji"]])
             await context.bot.add_sticker_to_set(
                 user_id=sub["from_user_id"],
                 name=STICKER_PACK_NAME,
@@ -166,7 +163,7 @@ async def approveall_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except Exception as e:
             logger.error(f"Bulk approve error on {sub['id']}: {e}")
             fail_count += 1
-            
+
     await msg.edit_text(f"✅ Bulk approval finished!\n- Success: {success_count}\n- Failed: {fail_count}")
 
 @admin_only
@@ -175,13 +172,13 @@ async def block_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("⚠️ Usage: /block <user_id>")
         return
-        
+
     try:
         target_user = int(context.args[0])
     except ValueError:
         await update.message.reply_text("❌ User ID must be a number.")
         return
-        
+
     queue_manager.block_user(target_user)
     await update.message.reply_text(f"🛑 User `{target_user}` has been blocked from submitting.", parse_mode="Markdown")
 
